@@ -4,7 +4,11 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/projectdiscovery/goflags"
@@ -27,22 +31,89 @@ func main() {
 	options = parseOptions()
 	debug("running the program")
 	makeSubsFromWordlist(options.wordlist, "subdomains")
-	fmt.Printf("%#v", *options)
+	sortAndUniquify("test")
 }
 
-func makeSubsFromWordlist(inputFilename, outputFilename string) error {
+func mergeFiles(file1, file2, output string) error {
+	//open output file or create if does not exist
+	destination, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		// The file already exists
+		return fmt.Errorf("the %v file already exists", output)
+	}
+	defer destination.Close()
+
+	f1, err := os.Open(file1)
+	if err != nil {
+		return err
+	}
+	defer f1.Close()
+
+	f2, err := os.Open(file2)
+	if err != nil {
+		return err
+	}
+	defer f2.Close()
+
+	io.Copy(destination, f1)
+	io.Copy(destination, f2)
+
+	/*f1Scanner := bufio.NewScanner(f1)
+	if f1Scanner.Scan() {
+		fmt.Fprintln(destination, f1Scanner.Text())
+	}
+
+	f2Scanner := bufio.NewScanner(f2)
+	if f2Scanner.Scan() {
+		fmt.Fprintln(destination, f2Scanner.Text())
+	}*/
+
+	return nil
+}
+
+func sortAndUniquify(file string) error {
+	content, err := ioutil.ReadFile(file)
+	if err != nil {
+		return err
+	}
+	// get file content as a string slice
+	lines := strings.Split(string(content), "\n")
+	// sort and uniquify the file
+	sort.Strings(lines)
+	uniqueLines := make([]string, 0, len(lines))
+	seen := make(map[string]bool)
+	for _, line := range lines {
+		if !seen[line] {
+			seen[line] = true
+			uniqueLines = append(uniqueLines, line)
+		}
+	}
+
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	for _, line := range uniqueLines {
+		fmt.Fprintln(f, line)
+	}
+	defer f.Close()
+
+	return nil
+}
+
+func makeSubsFromWordlist(wordlistFilename, subdomainsFilename string) error {
 	//open the wordlist file
-	wordlist, err := os.Open(inputFilename)
+	wordlist, err := os.Open(wordlistFilename)
 	if err != nil {
 		return err
 	}
 	defer wordlist.Close()
 
 	//open a file for subdomains
-	subdomains, err := os.OpenFile(outputFilename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	subdomains, err := os.OpenFile(subdomainsFilename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		// The file already exists
-		return fmt.Errorf("the %v file for subdomains already exists", outputFilename)
+		return fmt.Errorf("the %v file for subdomains already exists", subdomainsFilename)
 	}
 	defer subdomains.Close()
 
