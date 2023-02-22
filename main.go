@@ -7,6 +7,8 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -21,6 +23,7 @@ type Options struct {
 	fast     bool
 	cleanup  bool
 	verbose  bool
+	all      bool
 	// silent   bool
 	output string
 }
@@ -29,14 +32,68 @@ var options *Options
 
 func main() {
 	options = parseOptions()
-	debug("running the program")
-	makeSubsFromWordlist(options.wordlist, "subdomains")
-	sortAndUniquify("test")
+
+	//create a directory for the specified target domain
+	err := makeDir(options.domain)
+	if err != nil {
+		panic(err)
+	}
+
+	//generate subdomains based on the given wordlist
+	err = makeSubsFromWordlist(options.wordlist, "generated.subs")
+	if err != nil {
+		panic(err)
+	}
+
+	//run subfinder with the specified target domain
+	runSubfinder()
+	if err != nil {
+		panic(err)
+	}
+
+	//merge generated subdomains with subfinder output then sort and uniquify them
+	err = mergeFiles(path.Join(options.domain, "generated.subs"), path.Join(options.domain, "subfinder.out"), path.Join(options.domain, "shuffledns.in"))
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+func runSubfinder() error {
+	allOption := ""
+	if options.all {
+		allOption = "all"
+	}
+
+	cmd := exec.Command("subfinder", "-d", options.domain, allOption)
+	output, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+
+	// creating a file then writing the subfinder output to it
+	file, err := os.OpenFile(path.Join(options.domain, "subfinder.out"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	if err != nil {
+		return err
+	}
+	file.Write(output)
+
+	return nil
+}
+
+func makeDir(dirPath string) error {
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		if err := os.Mkdir(dirPath, 0777); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func mergeFiles(file1, file2, output string) error {
 	//open output file or create if does not exist
-	destination, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	destination, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		// The file already exists
 		return fmt.Errorf("the %v file already exists", output)
@@ -58,6 +115,12 @@ func mergeFiles(file1, file2, output string) error {
 	io.Copy(destination, f1)
 	io.Copy(destination, f2)
 
+	//sort then make unique
+	err = sortAndUniquify(output)
+	if err != nil {
+		return err
+	}
+
 	/*f1Scanner := bufio.NewScanner(f1)
 	if f1Scanner.Scan() {
 		fmt.Fprintln(destination, f1Scanner.Text())
@@ -76,8 +139,10 @@ func sortAndUniquify(file string) error {
 	if err != nil {
 		return err
 	}
+
 	// get file content as a string slice
 	lines := strings.Split(string(content), "\n")
+
 	// sort and uniquify the file
 	sort.Strings(lines)
 	uniqueLines := make([]string, 0, len(lines))
@@ -89,7 +154,12 @@ func sortAndUniquify(file string) error {
 		}
 	}
 
-	f, err := os.OpenFile(file, os.O_WRONLY|os.O_TRUNC, 0644)
+	// remove the blank line
+	if uniqueLines[0] == "" {
+		uniqueLines = uniqueLines[1:]
+	}
+
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_TRUNC, 0666)
 	if err != nil {
 		return err
 	}
@@ -101,7 +171,7 @@ func sortAndUniquify(file string) error {
 	return nil
 }
 
-func makeSubsFromWordlist(wordlistFilename, subdomainsFilename string) error {
+func makeSubsFromWordlist(wordlistFilename, generatedFilename string) error {
 	//open the wordlist file
 	wordlist, err := os.Open(wordlistFilename)
 	if err != nil {
@@ -110,10 +180,10 @@ func makeSubsFromWordlist(wordlistFilename, subdomainsFilename string) error {
 	defer wordlist.Close()
 
 	//open a file for subdomains
-	subdomains, err := os.OpenFile(subdomainsFilename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	subdomains, err := os.OpenFile(path.Join(options.domain, generatedFilename), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		// The file already exists
-		return fmt.Errorf("the %v file for subdomains already exists", subdomainsFilename)
+		return fmt.Errorf("the %v file for generated subdomains already exists", generatedFilename)
 	}
 	defer subdomains.Close()
 
@@ -178,6 +248,7 @@ func parseOptions() *Options {
 	flags.CreateGroup("options", "Options",
 		flags.BoolVarP(&options.fast, "fast", "f", false, "Fast switch for Dnsgen (default: false)"),
 		flags.BoolVarP(&options.cleanup, "cleanup", "c", false, "Unessential files cleanup"),
+		flags.BoolVarP(&options.all, "all", "a", false, "All flag for subfinder"),
 	)
 
 	flags.CreateGroup("output", "Output",
