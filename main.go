@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -31,48 +32,136 @@ type Options struct {
 var options *Options
 
 func main() {
+	//parse flags
 	options = parseOptions()
 
+	debug("making " + options.domain + " directory")
 	//create a directory for the specified target domain
 	err := makeDir(options.domain)
 	if err != nil {
 		panic(err)
 	}
 
+	debug("generating subdomain list based on the wordlist")
 	//generate subdomains based on the given wordlist
 	err = makeSubsFromWordlist(options.wordlist, "generated.subs")
 	if err != nil {
 		panic(err)
 	}
 
-	//run subfinder with the specified target domain
-	runSubfinder()
+	debug("running subfinder")
+	//run subfinder on the specified target domain
+	err = runSubfinder("subfinder.out")
 	if err != nil {
 		panic(err)
 	}
 
+	debug("merging generated subdomains with subfinder output")
 	//merge generated subdomains with subfinder output then sort and uniquify them
-	err = mergeFiles(path.Join(options.domain, "generated.subs"), path.Join(options.domain, "subfinder.out"), path.Join(options.domain, "shuffledns.in"))
+	err = mergeFiles(path.Join(options.domain, "generated.subs"), path.Join(options.domain, "subfinder.out"), path.Join(options.domain, "shuffledns_phase1.in"))
+	if err != nil {
+		panic(err)
+	}
+
+	debug("running shuffledns phase 1")
+	//run shuffledns
+	err = runShuffledns("shuffledns_phase1.in", "shuffledns_phase1.out")
+	if err != nil {
+		panic(err)
+	}
+
+	debug("merging resolved subdomains with subfinder output")
+	//merge the resolved subdomains and the subfinder output for permulation tools
+	err = mergeFiles(path.Join(options.domain, "shuffledns_phase1.out"), path.Join(options.domain, "subfinder.out"), path.Join(options.domain, "permutation.in"))
+	if err != nil {
+		panic(err)
+	}
+
+	debug("running dnsgen")
+	//run dnsgen on the resolved subdomains and the subfinder output merged file
+	err = runDnsgen(path.Join(options.domain, "permutation.in"), path.Join(options.domain, "shuffledns_phase2.in"))
+	if err != nil {
+		panic(err)
+	}
+
+	debug("running shuffledns phase 2")
+	//run shuffledns
+	err = runShuffledns(path.Join(options.domain, "shuffledns_phase2.in"), path.Join(options.domain, "shuffledns_phase2.out"))
+	if err != nil {
+		panic(err)
+	}
+
+	debug("merging the outputs of both phases of shuffledns")
+	//merge shuffledns_phase1.out with shuffledns_phase2.out
+	err = mergeFiles(path.Join(options.domain, "shuffledns_phase1.out"), path.Join(options.domain, "shuffledns_phase2.out"), path.Join(options.domain, options.output))
 	if err != nil {
 		panic(err)
 	}
 
 }
 
-func runSubfinder() error {
-	allOption := ""
-	if options.all {
-		allOption = "all"
+func runDnsgen(in, out string) error {
+	fastOption := ""
+	if options.fast {
+		fastOption = "-f"
 	}
 
-	cmd := exec.Command("subfinder", "-d", options.domain, allOption)
+	//run cat on input
+	cat := exec.Command("cat", path.Join(options.domain, in))
+	catOutput, err := cat.Output()
+	if err != nil {
+		return err
+	}
+
+	//provide dnsgen with the output from the cat command
+	cmd := exec.Command("dnsgen", "-", fastOption)
+	cmd.Stdin = bytes.NewReader(catOutput)
+	dnsgenOutput, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+
+	//create a file then write the dnsgen output to it
+	file, err := os.OpenFile(path.Join(options.domain, out), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	if err != nil {
+		return err
+	}
+	file.Write(dnsgenOutput)
+
+	return nil
+}
+
+func runShuffledns(in, out string) error {
+	cmd := exec.Command("shuffledns", "-d", options.domain, "-silent", "-r", options.resolver, "-l", path.Join(options.domain, in))
 	output, err := cmd.Output()
 	if err != nil {
 		return err
 	}
 
-	// creating a file then writing the subfinder output to it
-	file, err := os.OpenFile(path.Join(options.domain, "subfinder.out"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	// create a file then write the shuffledns output to it
+	file, err := os.OpenFile(path.Join(options.domain, out), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	if err != nil {
+		return err
+	}
+	file.Write(output)
+
+	return nil
+}
+
+func runSubfinder(out string) error {
+	allOption := ""
+	if options.all {
+		allOption = "all"
+	}
+
+	cmd := exec.Command("subfinder", "-d", options.domain, allOption, "-silent")
+	output, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+
+	// create a file then write the subfinder output to it
+	file, err := os.OpenFile(path.Join(options.domain, out), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		return err
 	}
@@ -237,7 +326,7 @@ func parseOptions() *Options {
 	options := &Options{}
 
 	flags := goflags.NewFlagSet()
-	flags.SetDescription("ResolveRaptor's a wrapper around DNS bruteforcing tools that implements a custom bruteforcing flow to find as much subdomains as possible")
+	flags.SetDescription("ResolveRaptor is a wrapper around DNS bruteforcing tools that implements a custom bruteforcing flow to find/resolve as much subdomains as possible")
 
 	flags.CreateGroup("input", "Input",
 		flags.StringVarP(&options.domain, "domain", "d", "", "Target domain name"),
