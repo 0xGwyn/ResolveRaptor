@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -32,6 +34,7 @@ type Options struct {
 var options *Options
 
 func main() {
+
 	//parse flags
 	options = parseOptions()
 
@@ -91,6 +94,61 @@ func main() {
 
 }
 
+func getAbusedbipSubs(out string) error {
+	debug("gathering subdomains from abusedbip")
+
+	req, err := http.NewRequest("GET", "https://www.abuseipdb.com/whois/"+options.domain, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("user-agent", "chrome")
+
+	// send get request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// convert the response to bytes
+	content, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	// grep matches
+	reg, err := regexp.Compile(`<li>\w.*</li>`)
+	if err != nil {
+		return err
+	}
+	submatches := reg.FindAllString(string(content), -1)
+
+	// create output file
+	file, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// write trimmed matches to output file
+	for _, submatch := range submatches {
+		submatch = strings.TrimPrefix(submatch, "<li>")
+		submatch = strings.TrimSuffix(submatch, "</li>")
+		subdomain := submatch + "." + options.domain
+		file.WriteString(subdomain + "\n")
+	}
+
+	return nil
+}
+
+func cleanup() error {
+	debug("cleaning up unnecessary files")
+	// to be implemented
+
+	return nil
+}
+
 func runDnsgen(in, out string) error {
 	debug("running dnsgen on " + path.Base(in))
 
@@ -119,6 +177,7 @@ func runDnsgen(in, out string) error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	file.Write(dnsgenOutput)
 
 	return nil
@@ -138,6 +197,7 @@ func runShuffledns(in, out string) error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	file.Write(output)
 
 	return nil
@@ -162,6 +222,7 @@ func runSubfinder(out string) error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	file.Write(output)
 
 	return nil
@@ -253,14 +314,16 @@ func sortAndUniquify(file string) error {
 		uniqueLines = uniqueLines[1:]
 	}
 
+	// open the same file to change its contents
 	f, err := os.OpenFile(file, os.O_WRONLY|os.O_TRUNC, 0666)
 	if err != nil {
 		return err
 	}
+	defer f.Close()
+
 	for _, line := range uniqueLines {
 		fmt.Fprintln(f, line)
 	}
-	defer f.Close()
 
 	return nil
 }
