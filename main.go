@@ -35,63 +35,54 @@ func main() {
 	//parse flags
 	options = parseOptions()
 
-	debug("creating " + options.domain + " directory")
 	//create a directory for the specified target domain
 	err := makeDir(options.domain)
 	if err != nil {
 		panic(err)
 	}
 
-	debug("generating subdomain list based on the wordlist")
 	//generate subdomains based on the given wordlist
 	err = makeSubsFromWordlist(options.wordlist, path.Join(options.domain, "generated.subs"))
 	if err != nil {
 		panic(err)
 	}
 
-	debug("running subfinder")
 	//run subfinder on the specified target domain
 	err = runSubfinder(path.Join(options.domain, "subfinder.out"))
 	if err != nil {
 		panic(err)
 	}
 
-	debug("merging generated subdomains with subfinder output")
 	//merge generated subdomains with subfinder output then sort and uniquify them
 	err = mergeFiles(path.Join(options.domain, "generated.subs"), path.Join(options.domain, "subfinder.out"), path.Join(options.domain, "shuffledns_phase1.in"))
 	if err != nil {
 		panic(err)
 	}
 
-	debug("running shuffledns phase 1")
 	//run shuffledns
 	err = runShuffledns(path.Join(options.domain, "shuffledns_phase1.in"), path.Join(options.domain, "shuffledns_phase1.out"))
 	if err != nil {
 		panic(err)
 	}
 
-	debug("merging resolved subdomains with subfinder output")
 	//merge the resolved subdomains and the subfinder output for permulation tools
 	err = mergeFiles(path.Join(options.domain, "shuffledns_phase1.out"), path.Join(options.domain, "subfinder.out"), path.Join(options.domain, "permutation.in"))
 	if err != nil {
 		panic(err)
 	}
 
-	debug("running dnsgen")
 	//run dnsgen on the resolved subdomains and the subfinder output merged file
 	err = runDnsgen(path.Join(options.domain, "permutation.in"), path.Join(options.domain, "shuffledns_phase2.in"))
 	if err != nil {
 		panic(err)
 	}
 
-	debug("running shuffledns phase 2")
 	//run shuffledns
 	err = runShuffledns(path.Join(options.domain, "shuffledns_phase2.in"), path.Join(options.domain, "shuffledns_phase2.out"))
 	if err != nil {
 		panic(err)
 	}
 
-	debug("merging the outputs of both phases of shuffledns")
 	//merge shuffledns_phase1.out with shuffledns_phase2.out
 	err = mergeFiles(path.Join(options.domain, "shuffledns_phase1.out"), path.Join(options.domain, "shuffledns_phase2.out"), path.Join(options.domain, options.output))
 	if err != nil {
@@ -101,6 +92,8 @@ func main() {
 }
 
 func runDnsgen(in, out string) error {
+	debug("running dnsgen on " + path.Base(in))
+
 	fastOption := ""
 	if options.fast {
 		fastOption = "-f"
@@ -132,6 +125,8 @@ func runDnsgen(in, out string) error {
 }
 
 func runShuffledns(in, out string) error {
+	debug("running shuffledns on " + path.Base(in))
+
 	cmd := exec.Command("shuffledns", "-silent", "-d", options.domain, "-r", options.resolver, "-l", in)
 	output, err := cmd.Output()
 	if err != nil {
@@ -149,6 +144,8 @@ func runShuffledns(in, out string) error {
 }
 
 func runSubfinder(out string) error {
+	debug("running subfinder on " + options.domain)
+
 	allOption := ""
 	if options.all {
 		allOption = "all"
@@ -172,22 +169,26 @@ func runSubfinder(out string) error {
 
 func makeDir(dirPath string) error {
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		debug("creating " + options.domain + " directory")
 		err = os.Mkdir(dirPath, 0777)
 		if err != nil {
 			return err
 		}
 		return nil
 	}
+	debug("skipping " + options.domain + " directory creation since it already exists")
 
-	return errors.New("the " + options.domain + " directory already exists")
+	return nil
 }
 
 func mergeFiles(file1, file2, output string) error {
+	debug("merging " + path.Base(file1) + " with " + path.Base(file2) + " and saving as " + path.Base(output))
+
 	//open output file or create if does not exist
 	destination, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		// The file already exists
-		return fmt.Errorf("the %v file already exists", output)
+		return fmt.Errorf("the %v file already exists", path.Base(output))
 	}
 	defer destination.Close()
 
@@ -226,6 +227,8 @@ func mergeFiles(file1, file2, output string) error {
 }
 
 func sortAndUniquify(file string) error {
+	debug("sorting and uniquifying " + path.Base(file))
+
 	content, err := ioutil.ReadFile(file)
 	if err != nil {
 		return err
@@ -263,6 +266,8 @@ func sortAndUniquify(file string) error {
 }
 
 func makeSubsFromWordlist(wordlistFilename, generatedFilename string) error {
+	debug("generating subdomain list based on the " + path.Base(wordlistFilename) + " wordlist file")
+
 	//open the wordlist file
 	wordlist, err := os.Open(wordlistFilename)
 	if err != nil {
@@ -274,7 +279,7 @@ func makeSubsFromWordlist(wordlistFilename, generatedFilename string) error {
 	subdomains, err := os.OpenFile(generatedFilename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		// The file already exists
-		return fmt.Errorf("the %v file for generated subdomains already exists", generatedFilename)
+		return fmt.Errorf("the %v file for generated subdomains already exists", path.Base(generatedFilename))
 	}
 	defer subdomains.Close()
 
