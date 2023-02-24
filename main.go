@@ -35,7 +35,7 @@ func main() {
 	//parse flags
 	options = parseOptions()
 
-	debug("making " + options.domain + " directory")
+	debug("creating " + options.domain + " directory")
 	//create a directory for the specified target domain
 	err := makeDir(options.domain)
 	if err != nil {
@@ -44,14 +44,14 @@ func main() {
 
 	debug("generating subdomain list based on the wordlist")
 	//generate subdomains based on the given wordlist
-	err = makeSubsFromWordlist(options.wordlist, "generated.subs")
+	err = makeSubsFromWordlist(options.wordlist, path.Join(options.domain, "generated.subs"))
 	if err != nil {
 		panic(err)
 	}
 
 	debug("running subfinder")
 	//run subfinder on the specified target domain
-	err = runSubfinder("subfinder.out")
+	err = runSubfinder(path.Join(options.domain, "subfinder.out"))
 	if err != nil {
 		panic(err)
 	}
@@ -65,7 +65,7 @@ func main() {
 
 	debug("running shuffledns phase 1")
 	//run shuffledns
-	err = runShuffledns("shuffledns_phase1.in", "shuffledns_phase1.out")
+	err = runShuffledns(path.Join(options.domain, "shuffledns_phase1.in"), path.Join(options.domain, "shuffledns_phase1.out"))
 	if err != nil {
 		panic(err)
 	}
@@ -107,7 +107,7 @@ func runDnsgen(in, out string) error {
 	}
 
 	//run cat on input
-	cat := exec.Command("cat", path.Join(options.domain, in))
+	cat := exec.Command("cat", in)
 	catOutput, err := cat.Output()
 	if err != nil {
 		return err
@@ -122,7 +122,7 @@ func runDnsgen(in, out string) error {
 	}
 
 	//create a file then write the dnsgen output to it
-	file, err := os.OpenFile(path.Join(options.domain, out), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	file, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		return err
 	}
@@ -132,14 +132,14 @@ func runDnsgen(in, out string) error {
 }
 
 func runShuffledns(in, out string) error {
-	cmd := exec.Command("shuffledns", "-d", options.domain, "-silent", "-r", options.resolver, "-l", path.Join(options.domain, in))
+	cmd := exec.Command("shuffledns", "-silent", "-d", options.domain, "-r", options.resolver, "-l", in)
 	output, err := cmd.Output()
 	if err != nil {
 		return err
 	}
 
 	// create a file then write the shuffledns output to it
-	file, err := os.OpenFile(path.Join(options.domain, out), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	file, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func runSubfinder(out string) error {
 	}
 
 	// create a file then write the subfinder output to it
-	file, err := os.OpenFile(path.Join(options.domain, out), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	file, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		return err
 	}
@@ -172,12 +172,14 @@ func runSubfinder(out string) error {
 
 func makeDir(dirPath string) error {
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
-		if err := os.Mkdir(dirPath, 0777); err != nil {
+		err = os.Mkdir(dirPath, 0777)
+		if err != nil {
 			return err
 		}
+		return nil
 	}
 
-	return nil
+	return errors.New("the " + options.domain + " directory already exists")
 }
 
 func mergeFiles(file1, file2, output string) error {
@@ -269,7 +271,7 @@ func makeSubsFromWordlist(wordlistFilename, generatedFilename string) error {
 	defer wordlist.Close()
 
 	//open a file for subdomains
-	subdomains, err := os.OpenFile(path.Join(options.domain, generatedFilename), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	subdomains, err := os.OpenFile(generatedFilename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		// The file already exists
 		return fmt.Errorf("the %v file for generated subdomains already exists", generatedFilename)
