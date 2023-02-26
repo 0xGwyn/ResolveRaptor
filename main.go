@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -34,7 +33,6 @@ type Options struct {
 var options *Options
 
 func main() {
-
 	//parse flags
 	options = parseOptions()
 
@@ -55,6 +53,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	//get subdomains from abuseipdb
+	// err = getAbusedbipSubs("abusedbip.out")
+	// if err != nil {
+	// 	panic(err)
+	// }
+
 
 	//merge generated subdomains with subfinder output then sort and uniquify them
 	err = mergeFiles(path.Join(options.domain, "generated.subs"), path.Join(options.domain, "subfinder.out"), path.Join(options.domain, "shuffledns_phase1.in"))
@@ -125,7 +130,7 @@ func getAbusedbipSubs(out string) error {
 	submatches := reg.FindAllString(string(content), -1)
 
 	// create output file
-	file, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	file, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		return err
 	}
@@ -173,7 +178,7 @@ func runDnsgen(in, out string) error {
 	}
 
 	//create a file then write the dnsgen output to it
-	file, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	file, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		return err
 	}
@@ -193,7 +198,7 @@ func runShuffledns(in, out string) error {
 	}
 
 	// create a file then write the shuffledns output to it
-	file, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	file, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		return err
 	}
@@ -218,7 +223,7 @@ func runSubfinder(out string) error {
 	}
 
 	// create a file then write the subfinder output to it
-	file, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	file, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		return err
 	}
@@ -245,14 +250,6 @@ func makeDir(dirPath string) error {
 func mergeFiles(file1, file2, output string) error {
 	debug("merging " + path.Base(file1) + " with " + path.Base(file2) + " and saving as " + path.Base(output))
 
-	//open output file or create if does not exist
-	destination, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
-	if err != nil {
-		// The file already exists
-		return fmt.Errorf("the %v file already exists", path.Base(output))
-	}
-	defer destination.Close()
-
 	f1, err := os.Open(file1)
 	if err != nil {
 		return err
@@ -265,6 +262,14 @@ func mergeFiles(file1, file2, output string) error {
 	}
 	defer f2.Close()
 
+	//create the file only if does not exist (output must be new)
+	destination, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		// The file already exists
+		return fmt.Errorf("the %v file already exists", path.Base(output))
+	}
+	defer destination.Close()
+
 	io.Copy(destination, f1)
 	io.Copy(destination, f2)
 
@@ -274,55 +279,49 @@ func mergeFiles(file1, file2, output string) error {
 		return err
 	}
 
-	/*f1Scanner := bufio.NewScanner(f1)
-	if f1Scanner.Scan() {
-		fmt.Fprintln(destination, f1Scanner.Text())
-	}
-
-	f2Scanner := bufio.NewScanner(f2)
-	if f2Scanner.Scan() {
-		fmt.Fprintln(destination, f2Scanner.Text())
-	}*/
-
 	return nil
 }
 
 func sortAndUniquify(file string) error {
 	debug("sorting and uniquifying " + path.Base(file))
 
-	content, err := ioutil.ReadFile(file)
+	// open the file
+	fIn, err := os.Open(file)
 	if err != nil {
-		return err
+		return nil
+	}
+	defer fIn.Close()
+
+	scanner := bufio.NewScanner(fIn)
+
+	// read the whole file into a map
+	uniqueLinesMap := make(map[string]bool)
+	for scanner.Scan() {
+		uniqueLinesMap[strings.TrimSpace(scanner.Text())] = true
 	}
 
-	// get file content as a string slice
-	lines := strings.Split(string(content), "\n")
-
-	// sort and uniquify the file
-	sort.Strings(lines)
-	uniqueLines := make([]string, 0, len(lines))
-	seen := make(map[string]bool)
-	for _, line := range lines {
-		if !seen[line] {
-			seen[line] = true
-			uniqueLines = append(uniqueLines, line)
-		}
+	var uniqueLinesSlice []string
+	for key := range uniqueLinesMap {
+		uniqueLinesSlice = append(uniqueLinesSlice, key)
 	}
+
+	// sort the file contents
+	sort.Strings(uniqueLinesSlice)
 
 	// remove the blank line
-	if uniqueLines[0] == "" {
-		uniqueLines = uniqueLines[1:]
+	if uniqueLinesSlice[0] == "" {
+		uniqueLinesSlice = uniqueLinesSlice[1:]
 	}
 
 	// open the same file to change its contents
-	f, err := os.OpenFile(file, os.O_WRONLY|os.O_TRUNC, 0666)
+	fOut, err := os.OpenFile(file, os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer fOut.Close()
 
-	for _, line := range uniqueLines {
-		fmt.Fprintln(f, line)
+	for _, line := range uniqueLinesSlice {
+		fmt.Fprintln(fOut, line)
 	}
 
 	return nil
@@ -339,7 +338,7 @@ func makeSubsFromWordlist(wordlistFilename, generatedFilename string) error {
 	defer wordlist.Close()
 
 	//open a file for subdomains
-	subdomains, err := os.OpenFile(generatedFilename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	subdomains, err := os.OpenFile(generatedFilename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		// The file already exists
 		return fmt.Errorf("the %v file for generated subdomains already exists", path.Base(generatedFilename))
