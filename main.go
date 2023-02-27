@@ -13,7 +13,9 @@ import (
 	"path"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/projectdiscovery/goflags"
@@ -43,73 +45,90 @@ func main() {
 		panic(err)
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(4)
+
 	//generate subdomains based on the given wordlist
-	err = makeSubsFromWordlist(options.wordlist, path.Join(options.domain, "generated.subs"))
-	if err != nil {
-		panic(err)
-	}
+	go func() {
+		defer wg.Done()
+		err = makeSubsFromWordlist(options.wordlist, path.Join(options.domain, "generated.subs"))
+		if err != nil {
+			panic(err)
+		}
+	}()
 
 	//run subfinder on the specified target domain
-	err = runSubfinder(path.Join(options.domain, "subfinder.out"))
-	if err != nil {
-		panic(err)
-	}
+	go func() {
+		defer wg.Done()
+		err = runSubfinder(path.Join(options.domain, "subfinder.subs"))
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	//get abuseipdb subs for the specified target domain
+	go func() {
+		defer wg.Done()
+		err = getAbuseipdbSubs(path.Join(options.domain, "abuseipdb.subs"))
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	//get crtsh subs for the specified target domain
+	go func() {
+		defer wg.Done()
+		err = getCrtshSubs(path.Join(options.domain, "crtsh.subs"))
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	// waiting for subfinder, crtsh and abusedpip results
+	wg.Wait()
 
 	/*
-		//get subdomains from abuseipdb
-		err = getAbusedbipSubs("abusedbip.out")
+		//merge generated subdomains with subfinder output then sort and uniquify them
+		err = mergeFiles(path.Join(options.domain, "generated.subs"), path.Join(options.domain, "subfinder.subs"), path.Join(options.domain, "shuffledns_phase1.in"))
 		if err != nil {
 			panic(err)
 		}
 
-		//get subdomains from crtsh
-		err = getCrtshSubs("crtsh.subs")
+		//run shuffledns
+		err = runShuffledns(path.Join(options.domain, "shuffledns_phase1.in"), path.Join(options.domain, "shuffledns_phase1.out"))
 		if err != nil {
 			panic(err)
-		}*/
+		}
 
-	//get subdomains from crtsh
+		//merge the resolved subdomains and the subfinder output for permulation tools
+		err = mergeFiles(path.Join(options.domain, "shuffledns_phase1.out"), path.Join(options.domain, "subfinder.subs"), path.Join(options.domain, "permutation.in"))
+		if err != nil {
+			panic(err)
+		}
 
-	//merge generated subdomains with subfinder output then sort and uniquify them
-	err = mergeFiles(path.Join(options.domain, "generated.subs"), path.Join(options.domain, "subfinder.out"), path.Join(options.domain, "shuffledns_phase1.in"))
-	if err != nil {
-		panic(err)
-	}
+		//run dnsgen on the resolved subdomains and the subfinder output merged file
+		err = runDnsgen(path.Join(options.domain, "permutation.in"), path.Join(options.domain, "shuffledns_phase2.in"))
+		if err != nil {
+			panic(err)
+		}
 
-	//run shuffledns
-	err = runShuffledns(path.Join(options.domain, "shuffledns_phase1.in"), path.Join(options.domain, "shuffledns_phase1.out"))
-	if err != nil {
-		panic(err)
-	}
+		//run shuffledns
+		err = runShuffledns(path.Join(options.domain, "shuffledns_phase2.in"), path.Join(options.domain, "shuffledns_phase2.out"))
+		if err != nil {
+			panic(err)
+		}
 
-	//merge the resolved subdomains and the subfinder output for permulation tools
-	err = mergeFiles(path.Join(options.domain, "shuffledns_phase1.out"), path.Join(options.domain, "subfinder.out"), path.Join(options.domain, "permutation.in"))
-	if err != nil {
-		panic(err)
-	}
-
-	//run dnsgen on the resolved subdomains and the subfinder output merged file
-	err = runDnsgen(path.Join(options.domain, "permutation.in"), path.Join(options.domain, "shuffledns_phase2.in"))
-	if err != nil {
-		panic(err)
-	}
-
-	//run shuffledns
-	err = runShuffledns(path.Join(options.domain, "shuffledns_phase2.in"), path.Join(options.domain, "shuffledns_phase2.out"))
-	if err != nil {
-		panic(err)
-	}
-
-	//merge shuffledns_phase1.out with shuffledns_phase2.out
-	err = mergeFiles(path.Join(options.domain, "shuffledns_phase1.out"), path.Join(options.domain, "shuffledns_phase2.out"), path.Join(options.domain, options.output))
-	if err != nil {
-		panic(err)
-	}
+		//merge shuffledns_phase1.out with shuffledns_phase2.out
+		err = mergeFiles(path.Join(options.domain, "shuffledns_phase1.out"), path.Join(options.domain, "shuffledns_phase2.out"), path.Join(options.domain, options.output))
+		if err != nil {
+			panic(err)
+		}
+	*/
 
 }
 
 func getCrtshSubs(out string) error {
-	debug("gathering subdomains from crtsh")
+	debug("gathering subdomains from Crt.sh")
 
 	type crtshSubs struct {
 		Common_name string `json:"common_name"`
@@ -150,10 +169,12 @@ func getCrtshSubs(out string) error {
 	// read the subdomains into a map to make it unique
 	uniqueLinesMap := make(map[string]bool)
 	for _, value := range jsonOutput {
-		uniqueLinesMap[value.Common_name] = true
+		// replace *. with empty string
+		wildcardOmitted := reg.ReplaceAllString(value.Common_name, "")
+		uniqueLinesMap[wildcardOmitted] = true
 
-		// replacee *. then split multiple subdomains
-		wildcardOmitted := reg.ReplaceAllString(value.Name_value, "")
+		// replace *. with empty string then split multiple subdomains
+		wildcardOmitted = reg.ReplaceAllString(value.Name_value, "")
 		splitted := strings.Split(wildcardOmitted, "\n")
 
 		for _, sub := range splitted {
@@ -173,11 +194,14 @@ func getCrtshSubs(out string) error {
 		fmt.Fprintln(file, sub)
 	}
 
+	// display number of subdomains found
+	debug("Crt.sh: " + strconv.Itoa(len(uniqueLinesMap)) + " subdomains were found")
+
 	return nil
 }
 
-func getAbusedbipSubs(out string) error {
-	debug("gathering subdomains from abusedbip")
+func getAbuseipdbSubs(out string) error {
+	debug("gathering subdomains from AbuseIPDB")
 
 	req, err := http.NewRequest("GET", "https://www.abuseipdb.com/whois/"+options.domain, nil)
 	if err != nil {
@@ -195,7 +219,7 @@ func getAbusedbipSubs(out string) error {
 
 	// check if the response code is not code 200
 	if resp.StatusCode != 200 {
-		debug("abusedbip failed")
+		debug("abuseipdb failed")
 		return nil
 	}
 
@@ -227,6 +251,9 @@ func getAbusedbipSubs(out string) error {
 		file.WriteString(subdomain + "\n")
 	}
 
+	// display number of subdomains found
+	debug("AbuseIPDB: " + strconv.Itoa(len(submatches)) + " subdomains were found")
+
 	return nil
 }
 
@@ -238,7 +265,7 @@ func cleanup() error {
 }
 
 func runDnsgen(in, out string) error {
-	debug("running dnsgen on " + path.Base(in))
+	debug("Running Dnsgen on " + path.Base(in))
 
 	fastOption := ""
 	if options.fast {
@@ -272,7 +299,7 @@ func runDnsgen(in, out string) error {
 }
 
 func runShuffledns(in, out string) error {
-	debug("running shuffledns on " + path.Base(in))
+	debug("running Shuffledns on " + path.Base(in))
 
 	cmd := exec.Command("shuffledns", "-silent", "-d", options.domain, "-r", options.resolver, "-l", in)
 	output, err := cmd.Output()
@@ -288,11 +315,14 @@ func runShuffledns(in, out string) error {
 	defer file.Close()
 	file.Write(output)
 
+	// display number of resolved subdomains
+	// debug("Shuffledns: " + strconv.Itoa(len(?)) + " subdomains were resolved")
+
 	return nil
 }
 
 func runSubfinder(out string) error {
-	debug("running subfinder on " + options.domain)
+	debug("gathering subdomains using Subfinder on " + options.domain)
 
 	allOption := ""
 	if options.all {
@@ -518,7 +548,8 @@ func debug(msg string) {
 
 func getCurrentTime() string {
 	currentTime := time.Now()
-	formattedTime := currentTime.Format("17:06:06")
+	// formattedTime := currentTime.Format("17:06:06")
+	formattedTime := fmt.Sprintf("%v:%v:%v", currentTime.Hour(), currentTime.Minute(), currentTime.Second())
 
 	return formattedTime
 }
