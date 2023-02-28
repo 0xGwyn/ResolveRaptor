@@ -87,43 +87,47 @@ func main() {
 	// waiting for subfinder, crtsh and abusedpip results
 	wg.Wait()
 
-	/*
-		//merge generated subdomains with subfinder output then sort and uniquify them
-		err = mergeFiles(path.Join(options.domain, "generated.subs"), path.Join(options.domain, "subfinder.subs"), path.Join(options.domain, "shuffledns_phase1.in"))
-		if err != nil {
-			panic(err)
-		}
+	//merge generated subdomains with subfinder output then sort and uniquify them
+	err = mergeFiles(path.Join(options.domain, "generated.subs"), path.Join(options.domain, "subfinder.subs"), path.Join(options.domain, "shuffledns_phase1.in"))
+	if err != nil {
+		panic(err)
+	}
 
-		//run shuffledns
-		err = runShuffledns(path.Join(options.domain, "shuffledns_phase1.in"), path.Join(options.domain, "shuffledns_phase1.out"))
-		if err != nil {
-			panic(err)
-		}
+	//merge crt.sh subdomains with abuseipdb subdomains then sort and uniquify them
+	err = mergeFiles(path.Join(options.domain, "crtsh.subs"), path.Join(options.domain, "abuseipdb.subs"), path.Join(options.domain, "shuffledns_phase1.in"))
+	if err != nil {
+		panic(err)
+	}
 
-		//merge the resolved subdomains and the subfinder output for permulation tools
-		err = mergeFiles(path.Join(options.domain, "shuffledns_phase1.out"), path.Join(options.domain, "subfinder.subs"), path.Join(options.domain, "permutation.in"))
-		if err != nil {
-			panic(err)
-		}
+	//run shuffledns
+	err = runShuffledns(path.Join(options.domain, "shuffledns_phase1.in"), path.Join(options.domain, "shuffledns_phase1.out"))
+	if err != nil {
+		panic(err)
+	}
 
-		//run dnsgen on the resolved subdomains and the subfinder output merged file
-		err = runDnsgen(path.Join(options.domain, "permutation.in"), path.Join(options.domain, "shuffledns_phase2.in"))
-		if err != nil {
-			panic(err)
-		}
+	//merge the resolved subdomains and the subfinder output for permulation tools
+	err = mergeFiles(path.Join(options.domain, "shuffledns_phase1.out"), path.Join(options.domain, "subfinder.subs"), path.Join(options.domain, "permutation.in"))
+	if err != nil {
+		panic(err)
+	}
 
-		//run shuffledns
-		err = runShuffledns(path.Join(options.domain, "shuffledns_phase2.in"), path.Join(options.domain, "shuffledns_phase2.out"))
-		if err != nil {
-			panic(err)
-		}
+	//run dnsgen on the resolved subdomains and the subfinder output merged file
+	err = runDnsgen(path.Join(options.domain, "permutation.in"), path.Join(options.domain, "shuffledns_phase2.in"))
+	if err != nil {
+		panic(err)
+	}
 
-		//merge shuffledns_phase1.out with shuffledns_phase2.out
-		err = mergeFiles(path.Join(options.domain, "shuffledns_phase1.out"), path.Join(options.domain, "shuffledns_phase2.out"), path.Join(options.domain, options.output))
-		if err != nil {
-			panic(err)
-		}
-	*/
+	//run shuffledns
+	err = runShuffledns(path.Join(options.domain, "shuffledns_phase2.in"), path.Join(options.domain, "shuffledns_phase2.out"))
+	if err != nil {
+		panic(err)
+	}
+
+	//merge shuffledns_phase1.out with shuffledns_phase2.out
+	err = mergeFiles(path.Join(options.domain, "shuffledns_phase1.out"), path.Join(options.domain, "shuffledns_phase2.out"), path.Join(options.domain, options.output))
+	if err != nil {
+		panic(err)
+	}
 
 }
 
@@ -154,6 +158,7 @@ func getCrtshSubs(out string) error {
 	// check if the response code is not code 200
 	if resp.StatusCode != 200 {
 		debug("crt.sh failed")
+		os.Create(out)
 		return nil
 	}
 
@@ -394,13 +399,22 @@ func mergeFiles(file1, file2, output string) error {
 	io.Copy(temp, f1)
 	io.Copy(temp, f2)
 
-	// create the file only if does not exist (output must be new)
-	destination, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		// The file already exists
-		return fmt.Errorf("the %v file already exists", path.Base(output))
+	// check if output is one of the inputs
+	var destination *os.File
+	if file1 == output || file2 == output {
+		destination, err = os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			return err
+		}
+		defer destination.Close()
+	} else {
+		destination, err = os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			// The file already exists
+			return fmt.Errorf("the %v file already exists", path.Base(output))
+		}
+		defer destination.Close()
 	}
-	defer destination.Close()
 
 	// reset offset then copy temp to destination
 	temp.Seek(0, 0)
@@ -476,11 +490,16 @@ func makeSubsFromWordlist(wordlistFilename, generatedFilename string) error {
 	}
 	defer subdomains.Close()
 
+	numOfLines := 0
 	scanner := bufio.NewScanner(wordlist)
 	for scanner.Scan() {
 		subdomain := fmt.Sprintf("%v.%v", scanner.Text(), options.domain)
 		fmt.Fprintln(subdomains, subdomain)
+		numOfLines++
 	}
+
+	// display number of subdomains generated
+	debug("Generated: " + strconv.Itoa(numOfLines) + " subdomains were generated")
 
 	return nil
 }
@@ -560,7 +579,7 @@ func parseOptions() *Options {
 func debug(msg string) {
 	if options.verbose {
 		time := getCurrentTime()
-		fmt.Printf("[%v] Debug: %v\n", time, msg)
+		fmt.Printf("[%v]\tDebug: %v\n", time, msg)
 	}
 }
 
