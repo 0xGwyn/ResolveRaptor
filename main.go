@@ -316,7 +316,8 @@ func runShuffledns(in, out string) error {
 	file.Write(output)
 
 	// display number of resolved subdomains
-	// debug("Shuffledns: " + strconv.Itoa(len(?)) + " subdomains were resolved")
+	resolved := strings.Split(string(output), "\n")
+	debug("Shuffledns: " + strconv.Itoa(len(resolved)) + " subdomains were resolved")
 
 	return nil
 }
@@ -343,6 +344,10 @@ func runSubfinder(out string) error {
 	defer file.Close()
 	file.Write(output)
 
+	// display number of subdomains found
+	subs := strings.Split(string(output), "\n")
+	debug("Subfinder: " + strconv.Itoa(len(subs)) + " subdomains were found")
+
 	return nil
 }
 
@@ -363,28 +368,43 @@ func makeDir(dirPath string) error {
 func mergeFiles(file1, file2, output string) error {
 	debug("merging " + path.Base(file1) + " with " + path.Base(file2) + " and saving as " + path.Base(output))
 
+	// open file 1
 	f1, err := os.Open(file1)
 	if err != nil {
 		return err
 	}
 	defer f1.Close()
 
+	// open file 2
 	f2, err := os.Open(file2)
 	if err != nil {
 		return err
 	}
 	defer f2.Close()
 
-	//create the file only if does not exist (output must be new)
-	destination, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	// create tmp file to merge file 1 and file 2 contents in case the output is one of the previous files (avoiding loop)
+	temp, err := os.CreateTemp("", "goMerge_")
+	if err != nil {
+		return err
+	}
+	defer temp.Close()
+	defer os.Remove(temp.Name())
+
+	// merge file 1 and file 2 into temp
+	io.Copy(temp, f1)
+	io.Copy(temp, f2)
+
+	// create the file only if does not exist (output must be new)
+	destination, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		// The file already exists
 		return fmt.Errorf("the %v file already exists", path.Base(output))
 	}
 	defer destination.Close()
 
-	io.Copy(destination, f1)
-	io.Copy(destination, f2)
+	// reset offset then copy temp to destination
+	temp.Seek(0, 0)
+	io.Copy(destination, temp)
 
 	//sort then make unique
 	err = sortAndUniquify(output)
@@ -413,6 +433,9 @@ func sortAndUniquify(file string) error {
 		uniqueLinesMap[strings.TrimSpace(scanner.Text())] = true
 	}
 
+	// remove the blank line if it exists
+	delete(uniqueLinesMap, "")
+
 	var uniqueLinesSlice []string
 	for key := range uniqueLinesMap {
 		uniqueLinesSlice = append(uniqueLinesSlice, key)
@@ -420,11 +443,6 @@ func sortAndUniquify(file string) error {
 
 	// sort the file contents
 	sort.Strings(uniqueLinesSlice)
-
-	// remove the blank line
-	if uniqueLinesSlice[0] == "" {
-		uniqueLinesSlice = uniqueLinesSlice[1:]
-	}
 
 	// open the same file to change its contents
 	fOut, err := os.OpenFile(file, os.O_WRONLY|os.O_TRUNC, 0644)
