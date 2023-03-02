@@ -29,8 +29,8 @@ type Options struct {
 	cleanup  bool
 	verbose  bool
 	all      bool
-	// silent   bool
-	output string
+	silent   bool
+	output   string
 }
 
 var options *Options
@@ -38,6 +38,9 @@ var options *Options
 func main() {
 	//parse flags
 	options = parseOptions()
+
+	//print banner
+	printBanner()
 
 	//create a directory for the specified target domain
 	err := makeDir(options.domain)
@@ -129,6 +132,9 @@ func main() {
 		panic(err)
 	}
 
+	//print results to stdout
+	printResults(path.Join(options.domain, options.output))
+
 	//cleanup only if the flag is set
 	if options.cleanup {
 		err := cleanup()
@@ -137,6 +143,45 @@ func main() {
 		}
 	}
 
+}
+
+func printBanner() {
+
+	banner := `
+____                  _           ____             _             
+|  _ \ ___  ___  ___ | |_   _____|  _ \ __ _ _ __ | |_ ___  _ __ 
+| |_) / _ \/ __|/ _ \| \ \ / / _ \ |_) / _' | '_ \| __/ _ \| '__|
+|  _ <  __/\__ \ (_) | |\ V /  __/  _ < (_| | |_) | || (_) | |   
+|_| \_\___||___/\___/|_| \_/ \___|_| \_\__,_| .__/ \__\___/|_|  
+					    |_|                  
+
+	`
+	if !options.silent {
+		fmt.Fprintln(os.Stdout, banner)
+	}
+}
+
+func printResults(file string) error {
+	debug("printing final results")
+
+	f, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	numOfLines := 0
+	for scanner.Scan() {
+		fmt.Fprintln(os.Stdout, scanner.Text())
+		numOfLines++
+	}
+
+	if !options.silent {
+		fmt.Printf("%v subdomains were resolved\n", numOfLines)
+	}
+
+	return nil
 }
 
 func getCrtshSubs(out string) error {
@@ -576,6 +621,7 @@ func parseOptions() *Options {
 		flags.BoolVarP(&options.fast, "fast", "f", false, "Fast switch for Dnsgen (default: false)"),
 		flags.BoolVarP(&options.cleanup, "cleanup", "c", false, "Unessential files cleanup"),
 		flags.BoolVarP(&options.all, "all", "a", false, "All flag for subfinder"),
+		flags.BoolVarP(&options.silent, "silent", "s", false, "Show only resolved subdomains"),
 	)
 
 	flags.CreateGroup("output", "Output",
