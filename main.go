@@ -336,11 +336,6 @@ func cleanup() error {
 func runDnsgen(in, out string) error {
 	debug("Running Dnsgen on " + path.Base(in))
 
-	fastOption := ""
-	if options.fast {
-		fastOption = "-f"
-	}
-
 	//run cat on input
 	cat := exec.Command("cat", in)
 	catOutput, err := cat.Output()
@@ -349,7 +344,12 @@ func runDnsgen(in, out string) error {
 	}
 
 	//provide dnsgen with the output from the cat command
-	cmd := exec.Command("dnsgen", "-", fastOption)
+	var cmd *exec.Cmd
+	if options.fast {
+		cmd = exec.Command("dnsgen", "-", "-f")
+	} else {
+		cmd = exec.Command("dnsgen", "-")
+	}
 	cmd.Stdin = bytes.NewReader(catOutput)
 	dnsgenOutput, err := cmd.Output()
 	if err != nil {
@@ -394,12 +394,12 @@ func runShuffledns(in, out string) error {
 func runSubfinder(out string) error {
 	debug("gathering subdomains using Subfinder on " + options.domain)
 
-	allOption := ""
+	var cmd *exec.Cmd
 	if options.all {
-		allOption = "all"
+		cmd = exec.Command("subfinder", "-d", options.domain, "-silent", "-all")
+	} else {
+		cmd = exec.Command("subfinder", "-d", options.domain, "-silent")
 	}
-
-	cmd := exec.Command("subfinder", "-d", options.domain, allOption, "-silent")
 	output, err := cmd.Output()
 	if err != nil {
 		return err
