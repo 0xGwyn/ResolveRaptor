@@ -129,6 +129,14 @@ func main() {
 		panic(err)
 	}
 
+	//cleanup only if the flag is set
+	if options.cleanup {
+		err := cleanup()
+		if err != nil {
+			panic(err)
+		}
+	}
+
 }
 
 func getCrtshSubs(out string) error {
@@ -141,7 +149,7 @@ func getCrtshSubs(out string) error {
 
 	var jsonOutput []crtshSubs
 
-	req, err := http.NewRequest("GET", "https://crt.sh/?q="+options.domain+"&output=json", nil)
+	req, err := http.NewRequest("GET", "http://crt.sh/?q="+options.domain+"&output=json", nil)
 	if err != nil {
 		return err
 	}
@@ -264,7 +272,18 @@ func getAbuseipdbSubs(out string) error {
 
 func cleanup() error {
 	debug("cleaning up unnecessary files")
-	// to be implemented
+
+	files := []string{
+		"crtsh.subs", "abuseipdb.subs", "subfinder.subs", "generated.subs", "shuffledns_phase1.in",
+		"shuffledns_phase1.out", "shuffledns_phase2.in", "shuffledns_phase2.out", "permutation.in",
+	}
+
+	for _, file := range files {
+		err := os.Remove(path.Join(options.domain, file))
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
