@@ -6,6 +6,8 @@ import (
 	"os"
 
 	"github.com/projectdiscovery/goflags"
+	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/gologger/levels"
 )
 
 type Options struct {
@@ -45,13 +47,14 @@ func ParseOptions() *Options {
 	)
 
 	if err := flags.Parse(); err != nil {
-		panic(err)
+		gologger.Fatal().Msg(err.Error())
 	}
 
 	if err := options.validateOptions(); err != nil {
-		fmt.Println(err.Error())
-		os.Exit(0)
+		gologger.Fatal().Msg(err.Error())
 	}
+
+	options.configureOutput()
 
 	if !options.silent {
 		showBanner()
@@ -60,6 +63,7 @@ func ParseOptions() *Options {
 	return options
 }
 
+// check if options are validated
 func (options *Options) validateOptions() error {
 	//Check if a domain is given
 	if options.domain == "" {
@@ -95,4 +99,15 @@ func (options *Options) validateOptions() error {
 	}
 
 	return nil
+}
+
+// configureOutput configures the output on the screen
+func (options *Options) configureOutput() {
+	// If the user desires verbose output, show verbose output
+	if options.verbose {
+		gologger.DefaultLogger.SetMaxLevel(levels.LevelVerbose)
+	}
+	if options.silent {
+		gologger.DefaultLogger.SetMaxLevel(levels.LevelSilent)
+	}
 }

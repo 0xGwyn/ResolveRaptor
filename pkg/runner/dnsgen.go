@@ -5,10 +5,12 @@ import (
 	"os"
 	"os/exec"
 	"path"
+
+	"github.com/projectdiscovery/gologger"
 )
 
 func runDnsgen(in, out string, fastFlag bool) error {
-	debug("Running Dnsgen on " + path.Base(in))
+	gologger.Debug().Msg("Running Dnsgen on " + path.Base(in))
 
 	//run cat on input
 	cat := exec.Command("cat", in)

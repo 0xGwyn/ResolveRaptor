@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/0xgwyn/resolveraptor/pkg/runner"
+	"github.com/projectdiscovery/gologger"
 )
 
 func main() {
@@ -9,12 +10,12 @@ func main() {
 
 	runner, err := runner.NewRunner(options)
 	if err != nil {
-		panic(err)
+		gologger.Fatal().Msg(err.Error())
 	}
 
 	err = runner.Start()
 	if err != nil {
-		panic(err)
+		gologger.Fatal().Msg(err.Error())
 	}
 
 }

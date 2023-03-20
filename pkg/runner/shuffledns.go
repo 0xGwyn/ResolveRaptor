@@ -6,10 +6,12 @@ import (
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/projectdiscovery/gologger"
 )
 
 func runShuffledns(domain, resolver, in, out string) error {
-	debug("running Shuffledns on " + path.Base(in))
+	gologger.Debug().Msg("running Shuffledns on " + path.Base(in))
 
 	cmd := exec.Command("shuffledns", "-silent", "-d", domain, "-r", resolver, "-l", in)
 	output, err := cmd.Output()
@@ -27,7 +29,7 @@ func runShuffledns(domain, resolver, in, out string) error {
 
 	// display number of resolved subdomains
 	resolved := strings.Split(string(output), "\n")
-	debug("Shuffledns: " + strconv.Itoa(len(resolved)) + " subdomains were resolved")
+	gologger.Debug().Msg("Shuffledns: " + strconv.Itoa(len(resolved)) + " subdomains were resolved")
 
 	return nil
 }

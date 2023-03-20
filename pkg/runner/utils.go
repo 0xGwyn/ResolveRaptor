@@ -9,18 +9,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
+
+	"github.com/projectdiscovery/gologger"
 )
 
-func getCurrentTime() string {
-	currentTime := time.Now()
-	formattedTime := fmt.Sprintf("%v:%v:%v", currentTime.Hour(), currentTime.Minute(), currentTime.Second())
-
-	return formattedTime
-}
-
 func sortAndUniquify(file string) error {
-	debug("sorting and uniquifying " + path.Base(file))
+	gologger.Debug().Msg("sorting and uniquifying " + path.Base(file))
 
 	// open the file
 	fIn, err := os.Open(file)
@@ -63,7 +57,7 @@ func sortAndUniquify(file string) error {
 }
 
 func mergeFiles(file1, file2, output string) error {
-	debug("merging " + path.Base(file1) + " with " + path.Base(file2) + " and saving as " + path.Base(output))
+	gologger.Debug().Msg("merging " + path.Base(file1) + " with " + path.Base(file2) + " and saving as " + path.Base(output))
 
 	// open file 1
 	f1, err := os.Open(file1)
@@ -123,20 +117,20 @@ func mergeFiles(file1, file2, output string) error {
 
 func makeDir(dirPath string) error {
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
-		// debug("creating " + options.domain + " directory")
+		gologger.Debug().Msg("creating " + dirPath + " directory")
 		err = os.Mkdir(dirPath, 0777)
 		if err != nil {
 			return err
 		}
 		return nil
 	}
-	// debug("skipping " + options.domain + " directory creation since it already exists")
+	gologger.Debug().Msg("skipping " + dirPath + " directory creation since it already exists")
 
 	return nil
 }
 
 func cleanup(dir string) error {
-	debug("cleaning up unnecessary files")
+	gologger.Debug().Msg("cleaning up unnecessary files")
 
 	//list of files
 	files := []string{
@@ -155,7 +149,7 @@ func cleanup(dir string) error {
 }
 
 func makeSubsFromWordlist(domain, wordlistFilename, generatedFilename string) error {
-	debug("generating subdomain list based on the " + path.Base(wordlistFilename) + " wordlist file")
+	gologger.Debug().Msg("generating subdomain list based on the " + path.Base(wordlistFilename) + " wordlist file")
 
 	//open the wordlist file
 	wordlist, err := os.Open(wordlistFilename)
@@ -181,13 +175,13 @@ func makeSubsFromWordlist(domain, wordlistFilename, generatedFilename string) er
 	}
 
 	// display number of subdomains generated
-	debug("Generated: " + strconv.Itoa(numOfLines) + " subdomains were generated")
+	gologger.Debug().Msg("Generated: " + strconv.Itoa(numOfLines) + " subdomains were generated")
 
 	return nil
 }
 
 func printResults(silentFlag bool, file string) error {
-	debug("printing final results")
+	gologger.Debug().Msg("printing final results")
 
 	f, err := os.Open(file)
 	if err != nil {
@@ -202,16 +196,7 @@ func printResults(silentFlag bool, file string) error {
 		numOfLines++
 	}
 
-	if !silentFlag {
-		fmt.Printf("%v subdomains were resolved\n", numOfLines)
-	}
+	gologger.Info().Msgf("%v subdomains were resolved\n", numOfLines)
 
 	return nil
-}
-
-func debug(msg string) {
-	// if verbose {
-	time := getCurrentTime()
-	fmt.Printf("[%v]\tDebug: %v\n", time, msg)
-	// }
 }

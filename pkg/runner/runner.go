@@ -3,6 +3,8 @@ package runner
 import (
 	"path"
 	"sync"
+
+	"github.com/projectdiscovery/gologger"
 )
 
 type Runner struct {
@@ -16,6 +18,8 @@ func NewRunner(options *Options) (*Runner, error) {
 }
 
 func (runner *Runner) Start() error {
+	gologger.Info().Msg("DNS Brute-forcing for " + runner.options.domain)
+
 	//create a directory for the specified target domain
 	err := makeDir(runner.options.domain)
 	if err != nil {
@@ -30,7 +34,7 @@ func (runner *Runner) Start() error {
 		defer wg.Done()
 		err = makeSubsFromWordlist(runner.options.domain, runner.options.wordlist, path.Join(runner.options.domain, "generated.subs"))
 		if err != nil {
-			panic(err)
+			gologger.Fatal().Msg("Error while making subdomains from wordlist: " + err.Error())
 		}
 	}()
 
@@ -39,7 +43,7 @@ func (runner *Runner) Start() error {
 		defer wg.Done()
 		err = runSubfinder(runner.options.domain, path.Join(runner.options.domain, "subfinder.subs"), runner.options.all)
 		if err != nil {
-			panic(err)
+			gologger.Fatal().Msg("Error while running subfinder: " + err.Error())
 		}
 	}()
 
@@ -48,7 +52,7 @@ func (runner *Runner) Start() error {
 		defer wg.Done()
 		err = getAbuseipdbSubs(runner.options.domain, path.Join(runner.options.domain, "abuseipdb.subs"))
 		if err != nil {
-			panic(err)
+			gologger.Fatal().Msg("Error while getting subdomains from Abuseipdb: " + err.Error())
 		}
 	}()
 
@@ -57,7 +61,7 @@ func (runner *Runner) Start() error {
 		defer wg.Done()
 		err = getCrtshSubs(runner.options.domain, path.Join(runner.options.domain, "crtsh.subs"))
 		if err != nil {
-			panic(err)
+			gologger.Fatal().Msg("Error while getting subdomains from Crt.sh: " + err.Error())
 		}
 	}()
 

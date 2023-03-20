@@ -5,10 +5,12 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/projectdiscovery/gologger"
 )
 
 func runSubfinder(domain, out string, allFlag bool) error {
-	debug("gathering subdomains using Subfinder on " + domain)
+	gologger.Debug().Msg("gathering subdomains using Subfinder on " + domain)
 
 	var cmd *exec.Cmd
 	if allFlag {
@@ -31,7 +33,7 @@ func runSubfinder(domain, out string, allFlag bool) error {
 
 	// display number of subdomains found
 	subs := strings.Split(string(output), "\n")
-	debug("Subfinder: " + strconv.Itoa(len(subs)) + " subdomains were found")
+	gologger.Debug().Msg("Subfinder: " + strconv.Itoa(len(subs)) + " subdomains were found")
 
 	return nil
 }

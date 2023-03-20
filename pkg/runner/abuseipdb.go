@@ -7,10 +7,12 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/projectdiscovery/gologger"
 )
 
 func getAbuseipdbSubs(domain, out string) error {
-	debug("gathering subdomains from AbuseIPDB")
+	gologger.Debug().Msg("gathering subdomains from AbuseIPDB")
 
 	req, err := http.NewRequest("GET", "https://www.abuseipdb.com/whois/"+domain, nil)
 	if err != nil {
@@ -22,13 +24,14 @@ func getAbuseipdbSubs(domain, out string) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
+		gologger.Warning().Msg("get request to abuseipdb failed")
 		return err
 	}
 	defer resp.Body.Close()
 
 	// check if the response code is not code 200
 	if resp.StatusCode != 200 {
-		// debug("abuseipdb failed")
+		gologger.Warning().Msg("abuseipdb failed")
 		return nil
 	}
 
@@ -61,7 +64,7 @@ func getAbuseipdbSubs(domain, out string) error {
 	}
 
 	// display number of subdomains found
-	debug("AbuseIPDB: " + strconv.Itoa(len(submatches)) + " subdomains were found")
+	gologger.Debug().Msg("AbuseIPDB: " + strconv.Itoa(len(submatches)) + " subdomains were found")
 
 	return nil
 }

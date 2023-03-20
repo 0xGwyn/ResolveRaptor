@@ -8,10 +8,12 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/projectdiscovery/gologger"
 )
 
 func getCrtshSubs(domain, out string) error {
-	debug("gathering subdomains from Crt.sh")
+	gologger.Debug().Msg("gathering subdomains from Crt.sh")
 
 	type crtshSubs struct {
 		Common_name string `json:"common_name"`
@@ -30,14 +32,14 @@ func getCrtshSubs(domain, out string) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
+		gologger.Warning().Msg("get request to crt.sh failed")
 		return err
 	}
 	defer resp.Body.Close()
 
 	// check if the response code is not code 200
 	if resp.StatusCode != 200 {
-		// debug("crt.sh failed")
-		// os.Create(out)
+		gologger.Warning().Msg("crt.sh failed")
 		return nil
 	}
 
@@ -79,7 +81,7 @@ func getCrtshSubs(domain, out string) error {
 	}
 
 	// display number of subdomains found
-	debug("Crt.sh: " + strconv.Itoa(len(uniqueLinesMap)) + " subdomains were found")
+	gologger.Debug().Msg("Crt.sh: " + strconv.Itoa(len(uniqueLinesMap)) + " subdomains were found")
 
 	return nil
 }
