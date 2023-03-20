@@ -1,0 +1,217 @@
+package runner
+
+import (
+	"bufio"
+	"fmt"
+	"io"
+	"os"
+	"path"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+)
+
+func getCurrentTime() string {
+	currentTime := time.Now()
+	formattedTime := fmt.Sprintf("%v:%v:%v", currentTime.Hour(), currentTime.Minute(), currentTime.Second())
+
+	return formattedTime
+}
+
+func sortAndUniquify(file string) error {
+	debug("sorting and uniquifying " + path.Base(file))
+
+	// open the file
+	fIn, err := os.Open(file)
+	if err != nil {
+		return nil
+	}
+	defer fIn.Close()
+
+	scanner := bufio.NewScanner(fIn)
+
+	// read the whole file into a map
+	uniqueLinesMap := make(map[string]bool)
+	for scanner.Scan() {
+		uniqueLinesMap[strings.TrimSpace(scanner.Text())] = true
+	}
+
+	// remove the blank line if it exists
+	delete(uniqueLinesMap, "")
+
+	var uniqueLinesSlice []string
+	for key := range uniqueLinesMap {
+		uniqueLinesSlice = append(uniqueLinesSlice, key)
+	}
+
+	// sort the file contents
+	sort.Strings(uniqueLinesSlice)
+
+	// open the same file to change its contents
+	fOut, err := os.OpenFile(file, os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer fOut.Close()
+
+	for _, line := range uniqueLinesSlice {
+		fmt.Fprintln(fOut, line)
+	}
+
+	return nil
+}
+
+func mergeFiles(file1, file2, output string) error {
+	debug("merging " + path.Base(file1) + " with " + path.Base(file2) + " and saving as " + path.Base(output))
+
+	// open file 1
+	f1, err := os.Open(file1)
+	if err != nil {
+		return err
+	}
+	defer f1.Close()
+
+	// open file 2
+	f2, err := os.Open(file2)
+	if err != nil {
+		return err
+	}
+	defer f2.Close()
+
+	// create tmp file to merge file 1 and file 2 contents in case the output is one of the previous files (avoiding loop)
+	temp, err := os.CreateTemp("", "goMerge_")
+	if err != nil {
+		return err
+	}
+	defer temp.Close()
+	defer os.Remove(temp.Name())
+
+	// merge file 1 and file 2 into temp
+	io.Copy(temp, f1)
+	io.Copy(temp, f2)
+
+	// check if output is one of the inputs
+	var destination *os.File
+	if file1 == output || file2 == output {
+		destination, err = os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			return err
+		}
+		defer destination.Close()
+	} else {
+		destination, err = os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			// The file already exists
+			return fmt.Errorf("the %v file already exists", path.Base(output))
+		}
+		defer destination.Close()
+	}
+
+	// reset offset then copy temp to destination
+	temp.Seek(0, 0)
+	io.Copy(destination, temp)
+
+	//sort then make unique
+	err = sortAndUniquify(output)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func makeDir(dirPath string) error {
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		// debug("creating " + options.domain + " directory")
+		err = os.Mkdir(dirPath, 0777)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	// debug("skipping " + options.domain + " directory creation since it already exists")
+
+	return nil
+}
+
+func cleanup(dir string) error {
+	debug("cleaning up unnecessary files")
+
+	//list of files
+	files := []string{
+		"crtsh.subs", "abuseipdb.subs", "subfinder.subs", "generated.subs", "shuffledns_phase1.in",
+		"shuffledns_phase1.out", "shuffledns_phase2.in", "shuffledns_phase2.out", "permutation.in",
+	}
+
+	for _, file := range files {
+		err := os.Remove(path.Join(dir, file))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func makeSubsFromWordlist(domain, wordlistFilename, generatedFilename string) error {
+	debug("generating subdomain list based on the " + path.Base(wordlistFilename) + " wordlist file")
+
+	//open the wordlist file
+	wordlist, err := os.Open(wordlistFilename)
+	if err != nil {
+		return err
+	}
+	defer wordlist.Close()
+
+	//open a file for subdomains
+	subdomains, err := os.OpenFile(generatedFilename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		// The file already exists
+		return fmt.Errorf("the %v file for generated subdomains already exists", path.Base(generatedFilename))
+	}
+	defer subdomains.Close()
+
+	numOfLines := 0
+	scanner := bufio.NewScanner(wordlist)
+	for scanner.Scan() {
+		subdomain := fmt.Sprintf("%v.%v", scanner.Text(), domain)
+		fmt.Fprintln(subdomains, subdomain)
+		numOfLines++
+	}
+
+	// display number of subdomains generated
+	debug("Generated: " + strconv.Itoa(numOfLines) + " subdomains were generated")
+
+	return nil
+}
+
+func printResults(silentFlag bool, file string) error {
+	debug("printing final results")
+
+	f, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	numOfLines := 0
+	for scanner.Scan() {
+		fmt.Fprintln(os.Stdout, scanner.Text())
+		numOfLines++
+	}
+
+	if !silentFlag {
+		fmt.Printf("%v subdomains were resolved\n", numOfLines)
+	}
+
+	return nil
+}
+
+func debug(msg string) {
+	// if verbose {
+	time := getCurrentTime()
+	fmt.Printf("[%v]\tDebug: %v\n", time, msg)
+	// }
+}
