@@ -105,6 +105,9 @@ func (options *Options) validateOptions() error {
 func (options *Options) configureOutput() {
 	// If the user desires verbose output, show verbose output
 	if options.verbose {
+		gologger.DefaultLogger.SetTimestamp(true, levels.LevelDebug)
+		gologger.DefaultLogger.SetTimestamp(true, levels.LevelWarning)
+		gologger.DefaultLogger.SetTimestamp(true, levels.LevelFatal)
 		gologger.DefaultLogger.SetMaxLevel(levels.LevelVerbose)
 	}
 	if options.silent {

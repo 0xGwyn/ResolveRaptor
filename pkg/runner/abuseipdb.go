@@ -7,12 +7,20 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/projectdiscovery/gologger"
 )
 
 func getAbuseipdbSubs(domain, out string) error {
 	gologger.Debug().Msg("gathering subdomains from AbuseIPDB")
+
+	// create output file
+	file, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 
 	req, err := http.NewRequest("GET", "https://www.abuseipdb.com/whois/"+domain, nil)
 	if err != nil {
@@ -21,7 +29,9 @@ func getAbuseipdbSubs(domain, out string) error {
 	req.Header.Set("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:110.0) Gecko/20100101 Firefox/110.0")
 
 	// send get request
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		gologger.Warning().Msg("get request to abuseipdb failed")
@@ -47,13 +57,6 @@ func getAbuseipdbSubs(domain, out string) error {
 		return err
 	}
 	submatches := reg.FindAllString(string(content), -1)
-
-	// create output file
-	file, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
 
 	// write trimmed matches to output file
 	for _, submatch := range submatches {
