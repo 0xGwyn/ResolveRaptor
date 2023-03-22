@@ -98,6 +98,12 @@ func (runner *Runner) Start() error {
 		return err
 	}
 
+	//sort and uniquify shuffledns_phase2.in
+	err = sortAndUniquify(path.Join(runner.options.domain, "shuffledns_phase2.in"))
+	if err != nil {
+		return err
+	}
+
 	//run shuffledns
 	err = runShuffledns(runner.options.domain, runner.options.resolver, path.Join(runner.options.domain, "shuffledns_phase2.in"), path.Join(runner.options.domain, "shuffledns_phase2.out"))
 	if err != nil {
