@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"bytes"
 	"os"
 	"os/exec"
 	"path"
@@ -12,9 +11,8 @@ import (
 func runDnsgen(in, out string, fastFlag bool) error {
 	gologger.Debug().Msg("Running Dnsgen on " + path.Base(in))
 
-	//run cat on input
-	cat := exec.Command("cat", in)
-	catOutput, err := cat.Output()
+	//read the input file
+	inputFile, err := os.Open(in)
 	if err != nil {
 		return err
 	}
@@ -26,7 +24,7 @@ func runDnsgen(in, out string, fastFlag bool) error {
 	} else {
 		cmd = exec.Command("dnsgen", "-")
 	}
-	cmd.Stdin = bytes.NewReader(catOutput)
+	cmd.Stdin = inputFile
 	dnsgenOutput, err := cmd.Output()
 	if err != nil {
 		return err
