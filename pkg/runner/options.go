@@ -50,14 +50,14 @@ func ParseOptions() *Options {
 		gologger.Fatal().Msg(err.Error())
 	}
 
-	if err := options.validateOptions(); err != nil {
-		gologger.Fatal().Msg(err.Error())
-	}
-
 	options.configureOutput()
 
 	if !options.silent {
 		showBanner()
+	}
+
+	if err := options.validateOptions(); err != nil {
+		gologger.Fatal().Msg(err.Error())
 	}
 
 	return options
