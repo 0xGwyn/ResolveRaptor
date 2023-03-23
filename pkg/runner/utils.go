@@ -56,6 +56,7 @@ func sortAndUniquify(file string) error {
 	return nil
 }
 
+// can handle if output is same as input
 func mergeFiles(file1, file2, output string) error {
 	gologger.Debug().Msg("merging " + path.Base(file1) + " with " + path.Base(file2) + " and saving as " + path.Base(output))
 
@@ -79,6 +80,7 @@ func mergeFiles(file1, file2, output string) error {
 		return err
 	}
 	defer temp.Close()
+	// remove tmp file later
 	defer os.Remove(temp.Name())
 
 	// merge file 1 and file 2 into temp

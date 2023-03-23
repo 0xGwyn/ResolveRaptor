@@ -98,8 +98,8 @@ func (runner *Runner) Start() error {
 		return err
 	}
 
-	//sort and uniquify shuffledns_phase2.in
-	err = sortAndUniquify(path.Join(runner.options.domain, "shuffledns_phase2.in"))
+	//merge permutation.in with shuffledns_phase2.in since dnsgen output does not contain all inputs
+	err = mergeFiles(path.Join(runner.options.domain, "shuffledns_phase2.in"), path.Join(runner.options.domain, "permutation.in"), path.Join(runner.options.domain, "shuffledns_phase2.in"))
 	if err != nil {
 		return err
 	}
