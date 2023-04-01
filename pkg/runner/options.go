@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/gologger"
@@ -65,12 +66,12 @@ func ParseOptions() *Options {
 
 // check if options are validated
 func (options *Options) validateOptions() error {
-	//Check if a domain is given
+	// check if a domain is given
 	if options.domain == "" {
 		return errors.New("domain name was not provided")
 	}
 
-	//Check if wordlist is given or if it exists
+	// check if wordlist is given or if it exists
 	if options.wordlist == "" {
 		return errors.New("no wordlist was provided")
 	}
@@ -78,7 +79,7 @@ func (options *Options) validateOptions() error {
 		return errors.New("wordlist file does not exist")
 	}
 
-	//Check if resolver file is given or if it exists
+	// check if resolver file is given or if it exists
 	if options.resolver == "" {
 		return errors.New("no resolver file was provided")
 	}
@@ -86,16 +87,31 @@ func (options *Options) validateOptions() error {
 		return errors.New("resolver file does not exist")
 	}
 
-	//Check if resolver file is empty
+	// check if resolver file is empty
 	if stat, err := os.Stat(options.resolver); err != nil {
 		return errors.New("an error occurred while opening the resolver file")
 	} else if stat.Size() <= 1 {
 		return errors.New("resolver file is empty")
 	}
 
-	//Check if output file already exists
+	// check if output file already exists
 	if _, err := os.Stat(options.output); !os.IsNotExist(err) {
 		return fmt.Errorf("a file under the name %v already exists", options.output)
+	}
+
+	// check if subfinder is installed
+	if _, err := exec.LookPath("subfinder"); err != nil {
+		return fmt.Errorf("subfinder is not found in the path")
+	}
+
+	// check if shuffledns is installed
+	if _, err := exec.LookPath("shuffledns"); err != nil {
+		return fmt.Errorf("shuffledns is not found in the path")
+	}
+
+	// check if dnsgen is installed
+	if _, err := exec.LookPath("dnsgen"); err != nil {
+		return fmt.Errorf("dnsgen is not found in the path")
 	}
 
 	return nil
