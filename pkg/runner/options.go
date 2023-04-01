@@ -114,6 +114,11 @@ func (options *Options) validateOptions() error {
 		return fmt.Errorf("dnsgen is not found in the path")
 	}
 
+	// check if chaos is installed
+	if _, err := exec.LookPath("chaos"); err != nil {
+		return fmt.Errorf("chaos is not found in the path")
+	}
+
 	return nil
 }
 
