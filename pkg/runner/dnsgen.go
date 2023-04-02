@@ -9,7 +9,7 @@ import (
 )
 
 func runDnsgen(in, out string, fastFlag bool) error {
-	gologger.Debug().Msg("Running Dnsgen on " + path.Base(in))
+	gologger.Debug().Msg("running Dnsgen on " + path.Base(in))
 
 	//read the input file
 	inputFile, err := os.Open(in)

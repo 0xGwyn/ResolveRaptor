@@ -27,7 +27,7 @@ func (runner *Runner) Start() error {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(4)
+	wg.Add(3)
 
 	//generate subdomains based on the given wordlist
 	go func() {
@@ -67,19 +67,7 @@ func (runner *Runner) Start() error {
 		}
 	}()
 
-	//get crtsh subs for the specified target domain
-	go func() {
-		defer wg.Done()
-		err = getCrtshSubs(
-			runner.options.domain,
-			path.Join(runner.options.domain, "crtsh.subs"),
-		)
-		if err != nil {
-			gologger.Fatal().Msg("Error while getting subdomains from Crt.sh: " + err.Error())
-		}
-	}()
-
-	//waiting for subfinder, crtsh and abusedpip results
+	//waiting for go routines
 	wg.Wait()
 
 	//merge generated subdomains with subfinder output then sort and uniquify them
@@ -92,10 +80,10 @@ func (runner *Runner) Start() error {
 		return err
 	}
 
-	//merge crt.sh subdomains with abuseipdb subdomains then sort and uniquify them
+	//merge abusedbip subdomains with shuffledns_phase1.in then sort and uniquify them
 	err = mergeFiles(
-		path.Join(runner.options.domain, "crtsh.subs"),
 		path.Join(runner.options.domain, "abuseipdb.subs"),
+		path.Join(runner.options.domain, "shuffledns_phase1.in"),
 		path.Join(runner.options.domain, "shuffledns_phase1.in"),
 	)
 	if err != nil {

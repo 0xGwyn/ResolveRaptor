@@ -136,7 +136,7 @@ func cleanup(dir string) error {
 
 	//list of files
 	files := []string{
-		"crtsh.subs", "abuseipdb.subs", "subfinder.subs", "generated.subs", "shuffledns_phase1.in",
+	    "abuseipdb.subs", "subfinder.subs", "generated.subs", "shuffledns_phase1.in",
 		"shuffledns_phase1.out", "shuffledns_phase2.in", "shuffledns_phase2.out", "permutation.in",
 	}
 
