@@ -27,7 +27,7 @@ func (runner *Runner) Start() error {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(5)
+	wg.Add(4)
 
 	//generate subdomains based on the given wordlist
 	go func() {
@@ -79,18 +79,6 @@ func (runner *Runner) Start() error {
 		}
 	}()
 
-	//get chaos subs for the specified target domain
-	go func() {
-		defer wg.Done()
-		err = getChaosSubs(
-			runner.options.domain,
-			path.Join(runner.options.domain, "chaos.subs"),
-		)
-		if err != nil {
-			gologger.Fatal().Msg("Error while getting subdomains from Chaos: " + err.Error())
-		}
-	}()
-
 	//waiting for subfinder, crtsh and abusedpip results
 	wg.Wait()
 
@@ -113,13 +101,6 @@ func (runner *Runner) Start() error {
 	if err != nil {
 		return err
 	}
-
-	//merge chaos subdomains with shuffledns_phase1.in then sort and uniquify them
-	err = mergeFiles(
-		path.Join(runner.options.domain, "chaos.subs"),
-		path.Join(runner.options.domain, "shuffledns_phase1.in"),
-		path.Join(runner.options.domain, "shuffledns_phase1.in"),
-	)
 
 	//run shuffledns
 	err = runShuffledns(runner.options.domain, runner.options.resolver,
