@@ -70,6 +70,31 @@ func ParseOptions() *Options {
 
 // checks if options are validated
 func (options *Options) validateOptions() error {
+	// checks if subfinder is installed
+	if _, err := exec.LookPath("subfinder"); err != nil {
+		return fmt.Errorf("subfinder is not found in the path")
+	}
+
+	// checks if shuffledns is installed
+	if _, err := exec.LookPath("shuffledns"); err != nil {
+		return fmt.Errorf("shuffledns is not found in the path")
+	}
+
+	if options.permutationTool == "dnsgen" {
+		// checks if dnsgen is installed
+		if _, err := exec.LookPath("dnsgen"); err != nil {
+			return fmt.Errorf("dnsgen is not found in the path")
+		}
+	} else if options.permutationTool == "alterx" {
+		// checks if alterx is installed
+		if _, err := exec.LookPath("alterx"); err != nil {
+			return fmt.Errorf("alterx is not found in the path")
+		}
+	} else {
+		// if permutation tool is unknown
+		return fmt.Errorf("the permutation tool given to the program is neither alterx nor dnsgen")
+	}
+
 	// checks if a domain is given
 	if options.domain == "" {
 		return errors.New("domain name was not provided")
@@ -101,31 +126,6 @@ func (options *Options) validateOptions() error {
 	// checks if output file already exists
 	if _, err := os.Stat(options.output); !os.IsNotExist(err) {
 		return fmt.Errorf("a file under the name %v already exists", options.output)
-	}
-
-	// checks if subfinder is installed
-	if _, err := exec.LookPath("subfinder"); err != nil {
-		return fmt.Errorf("subfinder is not found in the path")
-	}
-
-	// checks if shuffledns is installed
-	if _, err := exec.LookPath("shuffledns"); err != nil {
-		return fmt.Errorf("shuffledns is not found in the path")
-	}
-
-	if options.permutationTool == "dnsgen" {
-		// checks if dnsgen is installed
-		if _, err := exec.LookPath("dnsgen"); err != nil {
-			return fmt.Errorf("dnsgen is not found in the path")
-		}
-	} else if options.permutationTool == "alterx" {
-		// checks if alterx is installed
-		if _, err := exec.LookPath("alterx"); err != nil {
-			return fmt.Errorf("alterx is not found in the path")
-		}
-	} else {
-		// if permutation tool is unknown
-		return fmt.Errorf("the permutation tool given to the program is neither alterx nor dnsgen")
 	}
 
 	return nil
