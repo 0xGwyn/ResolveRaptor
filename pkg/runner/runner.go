@@ -109,14 +109,27 @@ func (runner *Runner) Start() error {
 		return err
 	}
 
-	//run dnsgen on the resolved subdomains and the subfinder output merged file
-	err = runDnsgen(
-		path.Join(runner.options.domain, "permutation.in"),
-		path.Join(runner.options.domain, "shuffledns_phase2.in"),
-		runner.options.fast,
-	)
-	if err != nil {
-		return err
+	// either run dnsgen or alterx
+	if runner.options.permutationTool == "alterx" {
+		//run alterx on the resolved subdomains and the subfinder output merged file
+		err = runAlterx(
+			path.Join(runner.options.domain, "permutation.in"),
+			path.Join(runner.options.domain, "shuffledns_phase2.in"),
+			runner.options.enrich,
+		)
+		if err != nil {
+			return err
+		}
+	} else if runner.options.permutationTool == "dnsgen" {
+		//run dnsgen on the resolved subdomains and the subfinder output merged file
+		err = runDnsgen(
+			path.Join(runner.options.domain, "permutation.in"),
+			path.Join(runner.options.domain, "shuffledns_phase2.in"),
+			runner.options.fast,
+		)
+		if err != nil {
+			return err
+		}
 	}
 
 	//merge permutation.in with shuffledns_phase2.in since dnsgen output does not contain all inputs
