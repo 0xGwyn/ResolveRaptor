@@ -164,10 +164,7 @@ func (runner *Runner) Start() error {
 	}
 
 	//print results to stdout
-	printResults(
-		runner.options.silent,
-		path.Join(runner.options.domain, runner.options.output),
-	)
+	printResults(path.Join(runner.options.domain, runner.options.output))
 
 	//cleanup only if the flag is set
 	if runner.options.cleanup {

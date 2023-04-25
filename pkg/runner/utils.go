@@ -136,7 +136,7 @@ func cleanup(dir string) error {
 
 	//list of files
 	files := []string{
-	    "abuseipdb.subs", "subfinder.subs", "generated.subs", "shuffledns_phase1.in",
+		"abuseipdb.subs", "subfinder.subs", "generated.subs", "shuffledns_phase1.in",
 		"shuffledns_phase1.out", "shuffledns_phase2.in", "shuffledns_phase2.out", "permutation.in",
 	}
 
@@ -182,7 +182,7 @@ func makeSubsFromWordlist(domain, wordlistFilename, generatedFilename string) er
 	return nil
 }
 
-func printResults(silentFlag bool, file string) error {
+func printResults(file string) error {
 	gologger.Debug().Msg("printing final results")
 
 	f, err := os.Open(file)

@@ -39,9 +39,9 @@ func ParseOptions() *Options {
 
 	flags.CreateGroup("options", "Options",
 		flags.BoolVarP(&options.fast, "fast", "f", false, "Fast flag for dnsgen"),
-		flags.BoolVarP(&options.cleanup, "cleanup", "c", false, "Unessential files cleanup"),
+		flags.BoolVarP(&options.cleanup, "cleanup", "c", false, "Clean up all files except the final result"),
 		flags.BoolVarP(&options.all, "all", "a", false, "All flag for subfinder"),
-		flags.BoolVarP(&options.silent, "silent", "s", false, "Show only resolved subdomains"),
+		flags.BoolVarP(&options.silent, "silent", "s", false, "Only show resolved subdomains"),
 		flags.BoolVarP(&options.enrich, "enrich", "en", false, "Enrich flag for alterx"),
 		flags.StringVarP(&options.permutationTool, "permutation-tool", "pt", "alterx", "Permutation tool (dnsgen or alterx)"),
 	)
@@ -126,6 +126,11 @@ func (options *Options) validateOptions() error {
 	// checks if output file already exists
 	if _, err := os.Stat(options.output); !os.IsNotExist(err) {
 		return fmt.Errorf("a file under the name %v already exists", options.output)
+	}
+
+	// checks if both silent and verbose flags are used
+	if options.verbose && options.silent {
+		return errors.New("can't use both silent and verbose mode")
 	}
 
 	return nil
