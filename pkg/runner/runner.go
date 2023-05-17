@@ -99,14 +99,33 @@ func (runner *Runner) Start() error {
 		return err
 	}
 
-	//merge the resolved subdomains and the subfinder output for permulation tools
-	err = mergeFiles(
-		path.Join(runner.options.domain, "shuffledns_phase1.out"),
-		path.Join(runner.options.domain, "subfinder.subs"),
-		path.Join(runner.options.domain, "permutation.in"),
-	)
-	if err != nil {
-		return err
+	// check if unresolved subdomains found in phase1 should be added for permutation
+	if runner.options.includeUnresolvedSubs {
+		//merge the resolved subdomains and the subfinder output for permulation tools
+		err = mergeFiles(
+			path.Join(runner.options.domain, "shuffledns_phase1.out"),
+			path.Join(runner.options.domain, "subfinder.subs"),
+			path.Join(runner.options.domain, "permutation.in"),
+		)
+		if err != nil {
+			return err
+		}
+
+		//merge the resolved subdomains and the abuseipdb output for permulation tools
+		err = mergeFiles(
+			path.Join(runner.options.domain, "abuseipdb.subs"),
+			path.Join(runner.options.domain, "permutation.in"),
+			path.Join(runner.options.domain, "permutation.in"),
+		)
+		if err != nil {
+			return err
+		}
+	} else {
+		// rename shuffledns_phase1.out to permutation.in
+		err = renameFile(
+			path.Join(runner.options.domain, "shuffledns_phase1.out"),
+			path.Join(runner.options.domain, "permutation.in"),
+		)
 	}
 
 	// either run dnsgen or alterx
@@ -117,9 +136,6 @@ func (runner *Runner) Start() error {
 			path.Join(runner.options.domain, "shuffledns_phase2.in"),
 			runner.options.enrich,
 		)
-		if err != nil {
-			return err
-		}
 	} else if runner.options.permutationTool == "dnsgen" {
 		//run dnsgen on the resolved subdomains and the subfinder output merged file
 		err = runDnsgen(
@@ -127,9 +143,9 @@ func (runner *Runner) Start() error {
 			path.Join(runner.options.domain, "shuffledns_phase2.in"),
 			runner.options.fast,
 		)
-		if err != nil {
-			return err
-		}
+	}
+	if err != nil {
+		return err
 	}
 
 	//merge permutation.in with shuffledns_phase2.in since dnsgen output does not contain all inputs
@@ -154,11 +170,20 @@ func (runner *Runner) Start() error {
 	}
 
 	//merge shuffledns_phase1.out with shuffledns_phase2.out
-	err = mergeFiles(
-		path.Join(runner.options.domain, "shuffledns_phase1.out"),
-		path.Join(runner.options.domain, "shuffledns_phase2.out"),
-		path.Join(runner.options.domain, runner.options.output),
-	)
+	//(if include_unresolved_subs is false then use permutation.in instead of shuffledns_phase1.out)
+	if runner.options.includeUnresolvedSubs {
+		err = mergeFiles(
+			path.Join(runner.options.domain, "shuffledns_phase1.out"),
+			path.Join(runner.options.domain, "shuffledns_phase2.out"),
+			path.Join(runner.options.domain, runner.options.output),
+		)
+	} else {
+		err = mergeFiles(
+			path.Join(runner.options.domain, "permutation.in"),
+			path.Join(runner.options.domain, "shuffledns_phase2.out"),
+			path.Join(runner.options.domain, runner.options.output),
+		)
+	}
 	if err != nil {
 		return err
 	}

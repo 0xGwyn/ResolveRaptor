@@ -12,17 +12,18 @@ import (
 )
 
 type Options struct {
-	domain          string
-	wordlist        string
-	resolver        string
-	fast            bool
-	cleanup         bool
-	verbose         bool
-	all             bool
-	silent          bool
-	enrich          bool
-	output          string
-	permutationTool string
+	domain                string
+	wordlist              string
+	resolver              string
+	fast                  bool
+	cleanup               bool
+	verbose               bool
+	all                   bool
+	silent                bool
+	enrich                bool
+	output                string
+	permutationTool       string
+	includeUnresolvedSubs bool
 }
 
 func ParseOptions() *Options {
@@ -44,6 +45,7 @@ func ParseOptions() *Options {
 		flags.BoolVarP(&options.silent, "silent", "s", false, "Only show resolved subdomains"),
 		flags.BoolVarP(&options.enrich, "enrich", "en", false, "Enrich flag for alterx"),
 		flags.StringVarP(&options.permutationTool, "permutation-tool", "pt", "alterx", "Permutation tool (dnsgen or alterx)"),
+		flags.BoolVarP(&options.includeUnresolvedSubs, "include-unresolved-subs", "ius", false, "Include unresolved subdomains for permutation also"),
 	)
 
 	flags.CreateGroup("output", "Output",

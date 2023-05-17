@@ -202,3 +202,12 @@ func printResults(file string) error {
 
 	return nil
 }
+
+func renameFile(old, new string) error {
+	err := os.Rename(old, new)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
