@@ -2,6 +2,17 @@
 ResolveRaptor is a wrapper around DNS bruteforcing tools that implements a custom bruteforcing flow to find/resolve as much subdomains as possible.
 It includes two phases.
 
+## Installation
+```bash
+go install github.com/0xgwyn/resolveraptor/cmd/resolveraptor@latest
+```
+or
+```bash
+git clone https://github.com/0xGwyn/ResolveRaptor.git
+cd ResolveRaptor
+build -o $GOPATH/bin/resolveraptor cmd/resolveraptor/main.go
+```
+
 ## Phase1
 Subdomains generated based on a wordlist plus the subdomains gathered from providers are resolved and saved as `shuffledns_phase1.out`
 
@@ -11,7 +22,7 @@ permutated. The permutation results are then resolved and saved as `shuffledns_p
 are merged in a file named `final` if no name is given for the output using `-o` flag.
 
 # Flags
-```
+```yaml
 INPUT:
    -d, -domain string    Target domain name
    -w, -wordlist string  DNS wordlist filename
