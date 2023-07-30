@@ -36,6 +36,7 @@ OPTIONS:
    -en, -enrich                    Enrich flag for alterx
    -pt, -permutation-tool string   Permutation tool (dnsgen or alterx) (default "alterx")
    -ius, -include-unresolved-subs  Include unresolved subdomains for permutation also
+   -as, -abuseipdb-session string  Abuseipdb_session cookie (required for abuseipdb)
 
 OUTPUT:
    -o, -output string  Output filename (default "final")
