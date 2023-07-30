@@ -22,6 +22,7 @@ type Options struct {
 	silent                bool
 	enrich                bool
 	output                string
+	abuseipdbSession      string
 	permutationTool       string
 	includeUnresolvedSubs bool
 }
@@ -30,7 +31,9 @@ func ParseOptions() *Options {
 	options := &Options{}
 
 	flags := goflags.NewFlagSet()
-	flags.SetDescription("ResolveRaptor is a wrapper for DNS bruteforcing tools that implements a custom bruteforcing flow to find/resolve as much subdomains as possible")
+	flags.SetDescription(
+		"ResolveRaptor is a wrapper for DNS bruteforcing tools that implements a custom bruteforcing flow to find/resolve as much subdomains as possible",
+	)
 
 	flags.CreateGroup("input", "Input",
 		flags.StringVarP(&options.domain, "domain", "d", "", "Target domain name"),
@@ -46,6 +49,7 @@ func ParseOptions() *Options {
 		flags.BoolVarP(&options.enrich, "enrich", "en", false, "Enrich flag for alterx"),
 		flags.StringVarP(&options.permutationTool, "permutation-tool", "pt", "alterx", "Permutation tool (dnsgen or alterx)"),
 		flags.BoolVarP(&options.includeUnresolvedSubs, "include-unresolved-subs", "ius", false, "Include unresolved subdomains for permutation also"),
+		flags.StringVarP(&options.abuseipdbSession, "abuseipdb-session", "as", "", "Abuseipdb_session cookie (required for abuseipdb)"),
 	)
 
 	flags.CreateGroup("output", "Output",

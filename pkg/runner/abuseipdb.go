@@ -12,7 +12,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 )
 
-func getAbuseipdbSubs(domain, out string) error {
+func getAbuseipdbSubs(domain, out, sessionCookie string) error {
 	gologger.Debug().Msg("gathering subdomains from AbuseIPDB")
 
 	// create output file
@@ -27,6 +27,15 @@ func getAbuseipdbSubs(domain, out string) error {
 		return err
 	}
 	req.Header.Set("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:110.0) Gecko/20100101 Firefox/110.0")
+
+	// create a new session cookie
+	cookie := &http.Cookie{
+		Name:  "abuseipdb_session",
+		Value: sessionCookie,
+	}
+
+	// add the session cookie to the request
+	req.AddCookie(cookie)
 
 	// send get request
 	client := &http.Client{

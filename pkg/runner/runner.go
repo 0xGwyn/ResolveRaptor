@@ -61,6 +61,7 @@ func (runner *Runner) Start() error {
 		err = getAbuseipdbSubs(
 			runner.options.domain,
 			path.Join(runner.options.domain, "abuseipdb.subs"),
+			runner.options.abuseipdbSession,
 		)
 		if err != nil {
 			gologger.Fatal().Msg("Error while getting subdomains from Abuseipdb: " + err.Error())
